@@ -1,0 +1,17 @@
+Flask==2.3.3
+flasgger==0.9.7.1
+python-dotenv==1.0.1
+bcrypt==4.3.0
+groq==0.13.1
+langchain-community==0.3.13
+langchain-core==0.3.28
+langchain-mistralai==0.2.4
+matplotlib==3.9.4
+pandas==2.2.3
+pydantic==2.10.4
+pypdf==5.1.0
+requests==2.31.0
+snowflake==1.0.2
+snowflake-connector-python==3.12.4
+snowflake-ml-python==1.7.2
+snowflake-snowpark-python==1.26.0
