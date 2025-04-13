@@ -14,44 +14,43 @@ def login():
     User Login
     ---
     tags:
-      - Auth
+      - Authentication
+    security: []  # ⛔ Explicitly says "no auth required"
     parameters:
       - name: body
         in: body
         required: true
         schema:
-          id: Login
-          required:
-            - email
-            - password
+          type: object
           properties:
             email:
               type: string
-              example: user@example.com
+              description: User email
+              example: ayusudi.abc@gmail.com
             password:
               type: string
-              example: mypassword
+              description: User password
+              example: prosterio2025
     responses:
       200:
         description: Login successful
         schema:
+          type: object
           properties:
-            access_token:
+            token:
               type: string
+              description: JWT token
             user:
               type: object
               properties:
                 id:
                   type: integer
-                name:
-                  type: string
                 email:
-                  type: string
-                role:
                   type: string
       401:
         description: Invalid credentials
     """
+
     data = request.get_json()
 
     email = data.get('email')
