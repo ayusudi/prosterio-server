@@ -3,16 +3,18 @@ import google.generativeai as genai
 from langchain_community.document_loaders import PyPDFLoader
 from dotenv import load_dotenv
 import os, tempfile, re, json
+from app.db import get_connection
 
 load_dotenv()
 documents_bp = Blueprint("documents", __name__, url_prefix="/api/documents")
 
 # Prompt template to guide Gemini
 PROMPT_TEMPLATE = """
+**Only extract data that appears in the CV text; do not invent or infer missing details. Use null for any missing single-value field and an empty list [] for any missing array. Strictly adhere to the date formats and data types described above.**
 Extract structured data from this CV text in JSON with the following fields:
 - full_name
 - email
-- job_titles
+- job_title 
 - promotion_years (as integer)
 - profile
 - skills (as list of strings)
@@ -21,6 +23,34 @@ Extract structured data from this CV text in JSON with the following fields:
 - publications (list)
 - distinctions (list)
 - certifications (list)
+
+for promotion_years is year of the first job she/he got
+
+for professional_experiences:
+- company
+- job_title
+- date_start (MMM YYYY)
+- date_end (MMM YYYY or "Current)
+- description
+
+for educations:
+- institution
+- title
+- score (score/max_score)
+- date_start (YYYY)
+- date_end (YYYY or "Current)
+- description
+
+for publications:
+- name
+- description
+- link
+
+for distinctions:
+- name
+- description
+
+for certifications is list of text (short title of certification, issuer and date issue)
 
 Return only valid JSON with no explanation or markdown.
 
@@ -51,16 +81,94 @@ def extract_with_gemini():
       200:
         description: A list of extracted CV data or errors per file
         schema:
-          type: array
-          items:
-            type: object
-            properties:
-              filename:
-                type: string
-              data:
+          type: object
+          properties:
+            data:
+              type: array
+              items:
                 type: object
-              error:
-                type: string
+                properties:
+                  filename:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      full_name:
+                        type: string
+                      email:
+                        type: string
+                      job_title:
+                        type: string
+                      promotion_years:
+                        type: integer
+                      profile:
+                        type: string
+                      skills:
+                        type: array
+                        items:
+                          type: string
+                      professional_experiences:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            company:
+                              type: string
+                            job_title:
+                              type: string
+                            date_start:
+                              type: string
+                            date_end:
+                              type: string
+                            description:
+                              type: string
+                      educations:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            institution:
+                              type: string
+                            title:
+                              type: string
+                            score:
+                              type: string
+                            date_start:
+                              type: string
+                            date_end:
+                              type: string
+                            description:
+                              type: string
+                      publications:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                            description:
+                              type: string
+                            link:
+                              type: string
+                      distinctions:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                            description:
+                              type: string
+                      certifications:
+                        type: array
+                        items:
+                          type: string
+                  error:
+                    type: string
+            email_status:
+              type: object
+              additionalProperties:
+                type: boolean
       400:
         description: No PDF files uploaded
       500:
@@ -79,7 +187,8 @@ def extract_with_gemini():
         model = genai.GenerativeModel("gemini-1.5-pro-latest")
 
         results = []
-
+        emails = []
+        
         for uploaded_file in uploaded_files:
             try:
                 with tempfile.NamedTemporaryFile(delete=True, suffix=".pdf") as tmp:
@@ -97,8 +206,13 @@ def extract_with_gemini():
                 match = re.search(r"\{.*\}", response_text, re.DOTALL)
                 if not match:
                     raise ValueError("No valid JSON found in Gemini response.")
-
+                
+   
                 json_data = json.loads(match.group(0))
+                if json_data.get("email"):
+                  email = json_data.get('email')
+                  emails.append(email)
+                  
                 results.append({
                     "filename": uploaded_file.filename,
                     "data": json_data
@@ -109,8 +223,27 @@ def extract_with_gemini():
                     "filename": uploaded_file.filename,
                     "error": str(file_error)
                 })
+                
+        email_status = {}
+        if emails:
+            conn = get_connection()
+            cursor = conn.cursor()
+            try:
+                cursor.execute("""
+                    SELECT email 
+                    FROM Employees 
+                    WHERE email IN ({})
+                    AND resign_status = FALSE
+                """.format(','.join(['%s'] * len(emails))), emails)
+                email_status = {email: False for email in emails}
+                for row in cursor.fetchall():
+                    email_status[row[0]] = True
+            finally:
+                cursor.close()
+                conn.close()
 
-        return jsonify(results), 200
+        return jsonify({"data": results, "email_status": email_status}), 200
 
     except Exception as e:
+      
         return jsonify({"error": str(e)}), 500

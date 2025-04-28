@@ -1,69 +1,35 @@
 CREATE TABLE Users (
     id INT PRIMARY KEY AUTOINCREMENT,
-    name VARCHAR NOT NULL,
-    email VARCHAR UNIQUE NOT NULL,
-    password BINARY(60); NOT NULL,
-    auth_firebase BOOLEAN DEFAULT FALSE,
+	name VARCHAR NOT NULL,
+	email VARCHAR UNIQUE NOT NULL,
     created_at TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP(),
     updated_at TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP(),
-    role VARCHAR NOT NULL,
+	role VARCHAR NOT NULL,
     is_deleted BOOLEAN DEFAULT FALSE,
-    date_deleted TIMESTAMP_TZ DEFAULT NULL
-);
-
+    deleted_at TIMESTAMP_TZ DEFAULT NULL
+	password BINARY,
+	otp_code VARCHAR(6),
+	expired_otp TIMESTAMP_NTZ
+)
 CREATE TABLE Employees (
     id INT PRIMARY KEY AUTOINCREMENT,
     full_name VARCHAR NOT NULL,
-    job_title VARCHAR NOT NULL,
     email VARCHAR UNIQUE NOT NULL,
+    job_title VARCHAR NOT NULL,
+    promotion_years INT,
+    profile TEXT,
     skills VARIANT,
+    professional_experiences VARIANT,
+    educations VARIANT,
+    publications VARIANT,
+    distinctions VARIANT,
+    certifications VARIANT,
     file_data BINARY,
     file_url TEXT,
     created_at TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP(),
     updated_at TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP(),
     resign_status BOOLEAN DEFAULT FALSE,
     resign_date TIMESTAMP_TZ DEFAULT NULL,
-    user_id INT REFERENCES Users(id) ON DELETE CASCADE
-);
-
-CREATE TABLE Clients (
-    id INT PRIMARY KEY AUTOINCREMENT,
-    company_name VARCHAR NOT NULL,
-    created_at TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP(),
-    updated_at TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP(),
-    user_id INT REFERENCES Users(id) ON DELETE CASCADE
-);
-
-CREATE TABLE Projects (
-    id INT PRIMARY KEY AUTOINCREMENT,
-    project_name VARCHAR NOT NULL,
-    detail_project TEXT,
-    requirements TEXT,
-    location VARCHAR,
-    hired_count INT DEFAULT 1,
-    max_stage INT DEFAULT 1,
-    stages VARIANT DEFAULT ['screening_cv'],
-    onsite_status BOOLEAN DEFAULT TRUE, 
-    project_month VARCHAR,
-    project_year INT DEFAULT 2025,
-    start_date DATE,
-    end_date DATE,
-    created_at TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP(),
-    updated_at TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP(),
-    client_id INT REFERENCES Clients(id) ON DELETE CASCADE,
-    archived BOOLEAN DEFAULT FALSE
-);
-
-CREATE TABLE Interview_Stages (
-    id INT PRIMARY KEY AUTOINCREMENT,
-    stage VARCHAR NOT NULL,
-    status VARCHAR NOT NULL,
-    notes TEXT,
-    historical_notes VARIANT,
-    created_at TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP(),
-    updated_at TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP(),
-    project_id INT REFERENCES Projects(id) ON DELETE CASCADE,
-    employee_id INT REFERENCES Employees(id) ON DELETE SET NULL,
     user_id INT REFERENCES Users(id) ON DELETE CASCADE
 );
 
@@ -75,3 +41,22 @@ CREATE TABLE Content_Chunks (
     employee_id INT REFERENCES Employees(id) ON DELETE SET NULL
 );
 
+CREATE TABLE Chats (
+    id INT PRIMARY KEY AUTOINCREMENT,
+    title VARCHAR NOT NULL,
+    chats VARIANT,
+    user_id INT REFERENCES Users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP(),
+    updated_at TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP(),
+    is_deleted BOOLEAN DEFAULT FALSE,
+    deleted_at TIMESTAMP_TZ DEFAULT NULL
+);
+
+CREATE TABLE Logs (
+    id INT AUTOINCREMENT PRIMARY KEY,
+    created_at TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP(),
+    action_table VARCHAR NOT NULL,
+    user_id INT REFERENCES Users(id) ON DELETE CASCADE,
+    log TEXT,
+    user_name VARCHAR
+);

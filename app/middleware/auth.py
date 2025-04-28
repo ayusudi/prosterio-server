@@ -11,10 +11,13 @@ def init_auth_middleware(app):
             "/swagger.json",
             "/flasgger_static",
             "/static",
-            "/api/login"
+            "/api/login",
+            "/api/forgot-password",
         )
         
-        if any(request.path.startswith(path) for path in exempt_paths or request.path == "/"):
+        print(request.path)
+        
+        if any(request.path.startswith(path) for path in exempt_paths) or request.path == "/":
             return
 
         if request.method == 'OPTIONS':
@@ -23,7 +26,7 @@ def init_auth_middleware(app):
         # Get the Authorization header
         token = request.headers.get("Authorization")
         if not token or not token.startswith("Bearer "):
-            return jsonify({'error': 'Missing or invalid Authorization header'}), 403
+            return jsonify({'error': 'Missing or invalid Authorization header'}), 401
 
         try:
             # Extract the token string

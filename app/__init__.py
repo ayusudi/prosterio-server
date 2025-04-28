@@ -2,13 +2,26 @@ from flask import Flask, redirect
 from flasgger import Swagger
 from app.routes import register_routes
 from app.middleware.auth import init_auth_middleware
+from flask_cors import CORS
+from flask_mail import Mail
+import os
 
 def create_app():
     app = Flask(__name__)
 
     # Make sure your app has CORS enabled if needed
-    # from flask_cors import CORS
-    # CORS(app)
+    CORS(app)
+
+    # Configure Flask-Mail
+    app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+    app.config['MAIL_PORT'] = 587
+    app.config['MAIL_USE_TLS'] = True
+    app.config['MAIL_USERNAME'] = os.getenv('EMAIL_OTP')
+    app.config['MAIL_PASSWORD'] = os.getenv('EMAIL_PS_OTP')
+    app.config['MAIL_DEFAULT_SENDER'] = os.getenv('EMAIL_OTP')
+
+    # Initialize Flask-Mail
+    mail = Mail(app)
 
     swagger_template = {
         "swagger": "2.0",
@@ -42,12 +55,7 @@ def create_app():
         {
             "name": "Documents",
             "description": "Endpoints for handling documents"
-        },
-        {
-            "name": "Clients",
-            "description": "Endpoints for managing clients"
-        },
-       
+        }
     ]
     }
 
