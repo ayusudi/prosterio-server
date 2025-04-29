@@ -55,6 +55,14 @@ def create_app():
         {
             "name": "Documents",
             "description": "Endpoints for handling documents"
+        },
+        {
+            "name": "Analytics",
+            "description": "Endpoints for analytics dashboard"
+        },
+        {
+            "name": "Chats",
+            "description": "Endpoints for managing chat history"
         }
     ]
     }
