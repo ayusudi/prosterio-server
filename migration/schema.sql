@@ -51,12 +51,3 @@ CREATE TABLE Chats (
     is_deleted BOOLEAN DEFAULT FALSE,
     deleted_at TIMESTAMP_TZ DEFAULT NULL
 );
-
-CREATE TABLE Logs (
-    id INT AUTOINCREMENT PRIMARY KEY,
-    created_at TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP(),
-    action_table VARCHAR NOT NULL,
-    user_id INT REFERENCES Users(id) ON DELETE CASCADE,
-    log TEXT,
-    user_name VARCHAR
-);

@@ -45,13 +45,27 @@ analytics_bp = Blueprint('analytics', __name__)
                         }
                     },
                     'education_to_job_title': {
-                        'type': 'array',
-                        'items': {
-                            'type': 'object',
-                            'properties': {
-                                'education': {'type': 'string'},
-                                'job_title': {'type': 'string'},
-                                'count': {'type': 'integer'}
+                        'type': 'object',
+                        'properties': {
+                            'nodes': {
+                                'type': 'array',
+                                'items': {
+                                    'type': 'object',
+                                    'properties': {
+                                        'name': {'type': 'string'}
+                                    }
+                                }
+                            },
+                            'links': {
+                                'type': 'array',
+                                'items': {
+                                    'type': 'object',
+                                    'properties': {
+                                        'source': {'type': 'integer'},
+                                        'target': {'type': 'integer'},
+                                        'value': {'type': 'integer'}
+                                    }
+                                }
                             }
                         }
                     }
@@ -116,7 +130,35 @@ def get_analytics():
             FROM Employees, LATERAL FLATTEN(input => PARSE_JSON(EDUCATIONS)) edu 
             GROUP BY education, JOB_TITLE
         """)
-        education_to_job_title = [{'education': row[0], 'job_title': row[1], 'count': row[2]} for row in cursor.fetchall()]
+        education_job_data = cursor.fetchall()
+
+        # Transform education_job_data into nodes and links
+        nodes = []
+        links = []
+        node_indices = {}
+
+        for education, job_title, count in education_job_data:
+            # Add education node if not exists
+            if education not in node_indices:
+                node_indices[education] = len(nodes)
+                nodes.append({"name": education})
+
+            # Add job title node if not exists
+            if job_title not in node_indices:
+                node_indices[job_title] = len(nodes)
+                nodes.append({"name": job_title})
+
+            # Add link
+            links.append({
+                "source": node_indices[education],
+                "target": node_indices[job_title],
+                "value": count
+            })
+
+        education_to_job_title = {
+            "nodes": nodes,
+            "links": links
+        }
 
         return jsonify({
             'job_title_distribution': job_title_distribution,

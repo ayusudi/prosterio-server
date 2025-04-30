@@ -1,8 +1,7 @@
 import bcrypt
 import snowflake.connector
-
 # The same password for all accounts
-password = "XXXXXX"
+password = "XXXXXXXX"
 
 # Hash the password
 hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
@@ -22,20 +21,12 @@ conn = snowflake.connector.connect(
 insert_sql = """
 INSERT INTO Users (name, email, password, role)
 VALUES 
-    (%s, %s, %s, %s),
-    (%s, %s, %s, %s),
-    (%s, %s, %s, %s),
-    (%s, %s, %s, %s),
     (%s, %s, %s, %s)
 """
 
 # Data for insertion (same hashed password for all users)
 values = (
-    'CEO', 'ceo@mail.com', hashed_password, 'SUPERUSER',
-    'Super User', 'super@user.com', hashed_password, 'SUPERUSER',
-    'Ayu', 'ayu@mail.com', hashed_password, 'HR',
-    'Reinhard', 'reinhard@mail.com', hashed_password, 'HR',
-    'Tama', 'tama@mail.com', hashed_password, 'HR'
+    'Tester', 'email', hashed_password, 'SUPERUSER',
 )
 
 # Execute the insert query
