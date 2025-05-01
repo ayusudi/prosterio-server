@@ -10,7 +10,7 @@ def create_app():
     app = Flask(__name__)
 
     # Make sure your app has CORS enabled if needed
-    CORS(app)
+    CORS(app, resources={r"/*": {"origins": "*"}})
 
     # Configure Flask-Mail
     app.config['MAIL_SERVER'] = 'smtp.gmail.com'
