@@ -86,7 +86,6 @@ def login():
             return jsonify({"error": "Invalid email or password"}), 401
 
         user_id, name, email, password, role  = user
-        print(user_id, name, password)
         hashed_password = bytes(password)
         
         # bcrypt needs the stored password as bytes

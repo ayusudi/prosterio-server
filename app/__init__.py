@@ -18,12 +18,16 @@ def create_app():
                 "http://localhost:5173",
                 "https://prosterio.onrender.com"
             ],
-            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
             "allow_headers": ["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
             "supports_credentials": True,
             "expose_headers": ["Content-Range", "X-Content-Range"]
         }
     })
+
+    # Configure static file serving for public folder
+    app.static_folder = os.path.join(app.root_path, 'public')
+    app.static_url_path = '/static'
 
     # Configure Flask-Mail
     app.config['MAIL_SERVER'] = 'smtp.gmail.com'
@@ -77,6 +81,18 @@ def create_app():
         {
             "name": "Chats",
             "description": "Endpoints for managing chat history"
+        },
+        {
+            "name": "Prompt",
+            "description": "Endpoints for chat prompts"
+        },
+        {
+            "name": "RAG",
+            "description": "Endpoints for feature RAG"
+        },
+        {
+            "name": "Gdrive",
+            "description": "Endpoints for managing Google Drive"
         }
     ]
     }

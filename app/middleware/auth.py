@@ -13,9 +13,9 @@ def init_auth_middleware(app):
             "/static",
             "/api/login",
             "/api/forgot-password",
+            "/public/pdfs",
+            "/pdfs",
         )
-        
-        print(request.path)
         
         if any(request.path.startswith(path) for path in exempt_paths) or request.path == "/":
             return

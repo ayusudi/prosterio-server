@@ -1,5 +1,5 @@
 # --- Imports ---
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, send_file, current_app
 # Replace psycopg2 with snowflake connector
 import snowflake.connector
 # Keep json for handling VARIANT data before insertion
@@ -8,6 +8,8 @@ import json
 from app.db import get_connection
 from flasgger import swag_from
 import json # Import json for handling VARIANT types
+import os
+from datetime import datetime
 
 from app.helpers.chunking import compile_to_chunk
 
@@ -126,7 +128,6 @@ employees_bp = Blueprint('employees', __name__, url_prefix='/api/employees')
 })
 def create_employee():
     try: 
-        print("HEI")
         data = request.get_json()
         if not data.get('employees'):
             return jsonify({"error": "No employees data provided"}), 400
@@ -186,7 +187,7 @@ def create_employee():
                     emp.get('certifications'),
                     emp.get('file_data'), # Ensure this is bytes if BINARY type
                     emp.get('file_url'),
-                    emp['user_id']
+                    emp['user_id'],
                 ) for emp in valid_employees
             ]
 
@@ -202,7 +203,7 @@ def create_employee():
                         v.value[3]::VARCHAR as job_title,
                         v.value[4]::INTEGER as promotion_years,
                         v.value[5]::VARCHAR as profile,
-                        PARSE_JSON(v.value[6]::VARCHAR) as skills, -- Parse JSON string if needed, or handle directly if connector supports dicts
+                        PARSE_JSON(v.value[6]::VARCHAR) as skills,
                         PARSE_JSON(v.value[7]::VARCHAR) as professional_experiences,
                         PARSE_JSON(v.value[8]::VARCHAR) as educations,
                         PARSE_JSON(v.value[9]::VARCHAR) as publications,
@@ -211,10 +212,10 @@ def create_employee():
                         BASE64_DECODE_BINARY(v.value[12]::VARCHAR) as file_data,
                         v.value[13]::VARCHAR as file_url,
                         v.value[14]::INTEGER as user_id
-                    FROM TABLE(FLATTEN(input => PARSE_JSON(%s))) v -- Pass data as JSON string
+                    FROM TABLE(FLATTEN(input => PARSE_JSON(%s))) v
                 ) AS source
-                ON target.id = source.id OR target.email = source.email -- Match on ID for updates, or email if ID is null/not provided
-                WHEN MATCHED AND source.id IS NOT NULL THEN -- Update existing based on ID
+                ON target.id = source.id OR target.email = source.email
+                WHEN MATCHED AND source.id IS NOT NULL THEN
                     UPDATE SET
                         target.full_name = source.full_name,
                         target.email = source.email,
@@ -230,13 +231,12 @@ def create_employee():
                         target.file_data = source.file_data,
                         target.file_url = source.file_url,
                         target.user_id = source.user_id,
-                        target.updated_at = CURRENT_TIMESTAMP()
-                WHEN NOT MATCHED THEN -- Insert new
+                WHEN NOT MATCHED THEN
                     INSERT (
                         full_name, email, job_title, promotion_years, profile,
                         skills, professional_experiences, educations,
                         publications, distinctions, certifications,
-                        file_data, file_url, user_id
+                        file_data, file_url, user_id, 
                     ) VALUES (
                         source.full_name, source.email, source.job_title, source.promotion_years, source.profile,
                         source.skills, source.professional_experiences, source.educations,
@@ -373,8 +373,6 @@ def create_employee():
                         'job_title': {'type': 'string'},
                         'email': {'type': 'string'},
                         'file_url': {'type': 'string'},
-                        'resign_status': {'type': 'boolean'},
-                        'resign_date': {'type': 'string', 'format': 'date-time'}
                     }
                 }
             }
@@ -388,8 +386,8 @@ def get_employees():
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            SELECT id, full_name, job_title, email, file_url, resign_status, resign_date
-            FROM employees
+            SELECT id, full_name, job_title, email, file_url
+            FROM employees 
         """)
         rows = cursor.fetchall()
         employees = [
@@ -398,9 +396,7 @@ def get_employees():
                 "full_name": row[1],
                 "job_title": row[2],
                 "email": row[3],
-                "file_url": row[4],
-                "resign_status": row[5],
-                "resign_date": row[6]
+                "file_url": row[4]
             }
             for row in rows
         ]
@@ -409,18 +405,16 @@ def get_employees():
         cursor.close()
         conn.close()
 
-
-
-@employees_bp.route('/<int:employee_id>/resign', methods=['PATCH'])
+@employees_bp.route('/<int:employee_id>', methods=['DELETE'])
 @swag_from({
     'tags': ['Employees'],
-    'summary': 'Resign employee and remove content chunks',
+    'summary': 'Delete employee and delete content chunks',
     'security': [{'Bearer': []}],
     'parameters': [
         {'name': 'employee_id', 'in': 'path', 'required': True, 'type': 'integer'}
     ],
     'responses': {
-        200: {'description': 'Employee resigned and content chunks removed'},
+        200: {'description': 'Employee deleted and content chunks removed'},
         404: {'description': 'Employee not found'}
     }
 })
@@ -428,22 +422,423 @@ def resign_employee(employee_id):
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("""
-            UPDATE employees
-            SET resign_status = TRUE,
-                resign_date = CURRENT_TIMESTAMP(),
-                updated_at = CURRENT_TIMESTAMP()
-            WHERE id = %s
-        """, (employee_id,))
-
+        cursor.execute("DELETE FROM content_chunks WHERE employee_id = %s", (employee_id,))
+        cursor.execute(f"DELETE FROM employees WHERE id = {employee_id}")
+        res = cursor.fetchall()
         if cursor.rowcount == 0:
             return jsonify({'error': 'Employee not found'}), 404
-
-        cursor.execute("DELETE FROM content_chunks WHERE employee_id = %s", (employee_id,))
-
         conn.commit()
         return jsonify({'message': 'Employee resigned and content chunks removed'}), 200
+    except Exception as e:
+        print(e)
+        return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
         conn.close()
+
+@employees_bp.route('/<int:employee_id>', methods=['GET'])
+@swag_from({
+    'tags': ['Employees'],
+    'summary': 'Get employee by ID',
+    'security': [{'Bearer': []}],
+    'parameters': [
+        {
+            'name': 'employee_id',
+            'in': 'path',
+            'required': True,
+            'type': 'integer',
+            'description': 'ID of the employee to retrieve'
+        }
+    ],
+    'responses': {
+        200: {
+            'description': 'Employee details',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'id': {'type': 'integer'},
+                    'full_name': {'type': 'string'},
+                    'email': {'type': 'string'},
+                    'job_title': {'type': 'string'},
+                    'promotion_years': {'type': 'integer'},
+                    'profile': {'type': 'string'},
+                    'skills': {'type': 'array', 'items': {'type': 'string'}},
+                    'professional_experiences': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'company': {'type': 'string'},
+                                'job_title': {'type': 'string'},
+                                'date_start': {'type': 'string'},
+                                'date_end': {'type': 'string'},
+                                'description': {'type': 'string'}
+                            }
+                        }
+                    },
+                    'educations': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'institution': {'type': 'string'},
+                                'title': {'type': 'string'},
+                                'score': {'type': 'string'},
+                                'date_start': {'type': 'string'},
+                                'date_end': {'type': 'string'},
+                                'description': {'type': 'string'}
+                            }
+                        }
+                    },
+                    'publications': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'name': {'type': 'string'},
+                                'description': {'type': 'string'},
+                                'link': {'type': 'string'}
+                            }
+                        }
+                    },
+                    'distinctions': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'name': {'type': 'string'},
+                                'description': {'type': 'string'}
+                            }
+                        }
+                    },
+                    'certifications': {'type': 'array', 'items': {'type': 'string'}},
+                    'file_url': {'type': 'string'},
+                }
+            }
+        },
+        404: {'description': 'Employee not found'},
+        500: {'description': 'Internal server error'}
+    }
+})
+def get_employee_by_id(employee_id):
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        # Query to get employee by ID and user_id
+        cur.execute(f"SELECT id, full_name, email, job_title, promotion_years, profile, skills, professional_experiences, educations, publications, distinctions, certifications, file_url, file_data FROM EMPLOYEES WHERE ID = {employee_id}")
+        employees = cur.fetchall()
+        if not employees:
+            return jsonify({"error": "Employee not found"}), 404
+        employee = employees[0]
+        # Create response without file_data first
+     
+        file_url = employee[12]
+        # If file_data exists, save it to public folder and update URL
+        if employee[13] is not None:
+            try:
+                # Convert to bytes if it's a bytearray
+                file_bytes = bytes(employee[13]) if isinstance(employee[13], bytearray) else employee[13]
+                
+                # Create public folder if it doesn't exist
+                public_folder = os.path.join(current_app.root_path, 'public', 'pdfs')
+                os.makedirs(public_folder, exist_ok=True)
+                
+                # Generate unique filename
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                filename = f"employee_{employee_id}_{timestamp}.pdf"
+                filepath = os.path.join(public_folder, filename)
+                
+                # Save the file
+                with open(filepath, 'wb') as f:
+                    f.write(file_bytes)
+                
+                # Update the file_url in the database
+                file_url = f"{request.scheme}://{request.host}/static/pdfs/{filename}"
+                
+            except Exception as e:
+                print(f"Error handling file data: {str(e)}")
+                return jsonify({"error": "Error processing file data"}), 500
+        
+        result = {
+            "id": employee[0],
+            "full_name": employee[1],
+            "email": employee[2],
+            "job_title": employee[3],
+            "promotion_years": employee[4],
+            "profile": employee[5],
+            "skills": json.loads(employee[6]),
+            "professional_experiences": json.loads(employee[7]),
+            "educations": json.loads(employee[8]),
+            "publications": json.loads(employee[9]),
+            "distinctions": json.loads(employee[10]),
+            "certifications": json.loads(employee[11]),
+            "file_url": file_url
+        }
+        return jsonify(result)
+    except Exception as e:
+        print(e)
+        print(f"Error getting employee: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@employees_bp.route('/<int:employee_id>', methods=['PUT'])
+@swag_from({
+    'tags': ['Employees'],
+    'summary': 'Update employee by ID',
+    'description': 'Update employee information excluding file_url and file_data',
+    'security': [{'Bearer': []}],
+    'parameters': [
+        {
+            'name': 'employee_id',
+            'in': 'path',
+            'type': 'integer',
+            'required': True,
+            'description': 'ID of the employee to update'
+        },
+        {
+            'name': 'body',
+            'in': 'body',
+            'required': True,
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'full_name': {'type': 'string', 'description': 'Full name of the employee'},
+                    'email': {'type': 'string', 'description': 'Email address'},
+                    'job_title': {'type': 'string', 'description': 'Current job title'},
+                    'promotion_years': {'type': 'integer', 'description': 'Years until promotion'},
+                    'profile': {'type': 'string', 'description': 'Employee profile/bio'},
+                    'skills': {
+                        'type': 'array',
+                        'items': {'type': 'string'},
+                        'description': 'List of skills'
+                    },
+                    'professional_experiences': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'company': {'type': 'string'},
+                                'job_title': {'type': 'string'},
+                                'date_start': {'type': 'string'},
+                                'date_end': {'type': 'string'},
+                                'description': {'type': 'string'}
+                            }
+                        }
+                    },
+                    'educations': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'institution': {'type': 'string'},
+                                'title': {'type': 'string'},
+                                'score': {'type': 'string'},
+                                'date_start': {'type': 'string'},
+                                'date_end': {'type': 'string'},
+                                'description': {'type': 'string'}
+                            }
+                        }
+                    },
+                    'publications': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'name': {'type': 'string'},
+                                'description': {'type': 'string'},
+                                'link': {'type': 'string'}
+                            }
+                        }
+                    },
+                    'distinctions': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'name': {'type': 'string'},
+                                'description': {'type': 'string'}
+                            }
+                        }
+                    },
+                    'certifications': {
+                        'type': 'array',
+                        'items': {'type': 'string'}
+                    }
+                },
+                'required': ['full_name', 'email', 'job_title']
+            }
+        }
+    ],
+    'responses': {
+        200: {
+            'description': 'Employee updated successfully',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'message': {'type': 'string'},
+                    'employee_id': {'type': 'integer'}
+                }
+            }
+        },
+        400: {
+            'description': 'Bad request',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        },
+        404: {
+            'description': 'Employee not found',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        },
+        500: {
+            'description': 'Internal server error',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        }
+    }
+})
+def update_employee_by_id(employee_id):
+    """Update employee details by ID"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['full_name', 'email', 'job_title']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"error": f"Missing required field: {field}"}), 400
+
+        conn = get_connection()
+        cur = conn.cursor()
+        
+        # Check if employee exists
+        cur.execute(f"SELECT id FROM EMPLOYEES WHERE ID = {employee_id}")
+        if not cur.fetchone():
+            return jsonify({"error": "Employee not found"}), 404
+
+        # Prepare update fields and values separately for VARIANT fields
+        variant_fields = {
+            'skills': data.get('skills', []),
+            'professional_experiences': data.get('professional_experiences', []),
+            'educations': data.get('educations', []),
+            'publications': data.get('publications', []),
+            'distinctions': data.get('distinctions', []),
+            'certifications': data.get('certifications', [])
+        }
+        
+        # Regular fields
+        regular_fields = {
+            'full_name': data.get('full_name'),
+            'email': data.get('email'),
+            'job_title': data.get('job_title'),
+            'promotion_years': data.get('promotion_years'),
+            'profile': data.get('profile')
+        }
+        
+        try:
+            # Build update query with proper Snowflake VARIANT handling
+            variant_updates = []
+            for key, value in variant_fields.items():
+                json_str = json.dumps(value)
+                variant_updates.append(f"{key} = PARSE_JSON(TO_VARCHAR({json_str}))")
+            
+            # Handle regular fields
+            regular_updates = []
+            for key, value in regular_fields.items():
+                if value is not None:
+                    escaped_value = str(value).replace("'", "''")
+                    regular_updates.append(f"{key} = '{escaped_value}'")
+                else:
+                    regular_updates.append(f"{key} = NULL")
+            
+            # Combine both clauses
+            set_clause = ", ".join(regular_updates + variant_updates)
+            
+            
+            # Execute update
+            cur.execute("""
+                UPDATE Employees SET
+                    full_name = %s,
+                    email = %s,
+                    job_title = %s,
+                    promotion_years = %s,
+                    profile = %s,
+                    skills = %s,
+                    professional_experiences = %s,
+                    educations = %s,
+                    publications = %s,
+                    distinctions = %s,
+                    certifications = %s,
+                    user_id = %s,
+                    updated_at = CURRENT_TIMESTAMP()
+                WHERE ID = %s
+            """, (data['full_name'], data['email'], data['job_title'], data['promotion_years'], data['profile'], json.dumps(data['skills']), json.dumps(data['professional_experiences']), json.dumps(data['educations']), json.dumps(data['publications']), json.dumps(data['distinctions']), json.dumps(data['certifications']), g.user_id, employee_id))
+            res = cur.fetchall()
+            # Update content chunks with proper escaping
+            cur.execute(f"DELETE FROM Content_Chunks WHERE employee_id = {employee_id}")
+            
+            # Create new content chunks
+            content_chunks = compile_to_chunk(data=data, employee_id=employee_id, user_id=g.user_id)
+            
+            # Insert new chunks with proper escaping
+            chunk_values = []
+            for chunk in content_chunks:
+                chunk_text = chunk['chunk_text'].replace("'", "''")
+                chunk_type = chunk['type'].replace("'", "''")
+                chunk_values.append(f"""(
+                    {chunk['employee_id']}, 
+                    {g.user_id}, 
+                    '{chunk_type}', 
+                    '{chunk_text}'
+                )""")
+            
+            if chunk_values:
+                chunks_insert_query = f"""
+                    INSERT INTO Content_Chunks (employee_id, user_id, type, chunk_text)
+                    VALUES {', '.join(chunk_values)}
+                """
+                cur.execute(chunks_insert_query)
+            
+            conn.commit()
+            return jsonify({
+                "message": "Employee updated successfully",
+                "employee_id": employee_id
+            }), 200
+            
+        except json.JSONDecodeError as e:
+            print(f"JSON Error: {str(e)}")
+            if conn:
+                conn.rollback()
+            return jsonify({"error": "Invalid JSON data provided"}), 400
+        except Exception as e:
+            print(f"Error processing update: {str(e)}")
+            if conn:
+                conn.rollback()
+            return jsonify({"error": "Error processing update"}), 500
+        
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        if conn:
+            conn.rollback()
+        return jsonify({"error": "Internal server error"}), 500
+        
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 

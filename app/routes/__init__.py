@@ -6,7 +6,8 @@ from .chats import chats_bp
 from .prompt import prompt_bp
 from .rag import rag_bp
 from .forgot_password import forgot_password_bp
-from app.routes.analytics import analytics_bp
+from .analytics import analytics_bp
+from .gdrive import gdrive_bp
 
 def register_routes(app):
     app.register_blueprint(auth_bp)
@@ -18,4 +19,4 @@ def register_routes(app):
     app.register_blueprint(prompt_bp)
     app.register_blueprint(rag_bp)
     app.register_blueprint(analytics_bp)
-
+    app.register_blueprint(gdrive_bp)
