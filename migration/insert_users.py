@@ -14,6 +14,7 @@ conn = snowflake.connector.connect(
     warehouse="XXXXXX_snowflake_warehouse",
     database="XXXXXX_snowflake_database",
     schema="XXXXXX_snowflake_schema",
+    ocsp_fail_open=True
 )
 
 
