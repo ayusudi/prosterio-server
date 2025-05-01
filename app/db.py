@@ -12,6 +12,8 @@ def get_connection():
         warehouse=os.getenv("SNOWFLAKE_WAREHOUSE"),
         database=os.getenv("SNOWFLAKE_DATABASE"),
         schema=os.getenv("SNOWFLAKE_SCHEMA"),
-        ocsp_fail_open=True
+        ocsp_fail_open=True,
+        ocsp_response_cache_filename=None,  # Disable OCSP caching
+        insecure_mode=True  # Skip certificate validation - use with caution
     )
     return conn
