@@ -14,7 +14,6 @@ snowflake==1.0.2
 snowflake-connector-python==3.12.4
 snowflake-ml-python==1.7.2
 snowflake-snowpark-python==1.26.0
-
 groq==0.13.1
 langchain-mistralai==0.2.4
 matplotlib==3.9.4

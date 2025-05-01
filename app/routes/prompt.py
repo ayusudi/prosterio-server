@@ -33,7 +33,7 @@ This ensures that the assistant remains focused, safe, and aligned with its purp
 
 @prompt_bp.route('/prompt', methods=['POST'])
 @swag_from({
-    'tags': ['prompt'],
+    'tags': ['Prompt'],
     'description': 'Process a prompt and get AI response',
     'parameters': [
         {
