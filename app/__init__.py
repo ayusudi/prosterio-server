@@ -9,8 +9,21 @@ import os
 def create_app():
     app = Flask(__name__)
 
-    # Make sure your app has CORS enabled if needed
-    CORS(app, resources={r"/*": {"origins": "*"}})
+    # Configure CORS with specific origins and options
+    CORS(app, resources={
+        r"/*": {
+            "origins": [
+                "https://prosterio.vercel.app",
+                "http://localhost:3000",
+                "http://localhost:5173",
+                "https://prosterio.onrender.com"
+            ],
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+            "supports_credentials": True,
+            "expose_headers": ["Content-Range", "X-Content-Range"]
+        }
+    })
 
     # Configure Flask-Mail
     app.config['MAIL_SERVER'] = 'smtp.gmail.com'
