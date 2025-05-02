@@ -27,8 +27,6 @@ def create_user():
               type: string
             password:
               type: string
-            role:
-              type: string
     responses:
       201:
         description: User created successfully
@@ -74,7 +72,7 @@ def create_user():
     name = data.get("name")
     email = data.get("email")
     password = data.get("password")
-    role = data.get("role")
+    role = "HR"
 
     if not all([name, email, password, role]):
         return jsonify({"error": "Missing required fields"}), 400
