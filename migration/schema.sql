@@ -6,11 +6,12 @@ CREATE TABLE Users (
     updated_at TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP(),
 	role VARCHAR NOT NULL,
     is_deleted BOOLEAN DEFAULT FALSE,
-    deleted_at TIMESTAMP_TZ DEFAULT NULL
+    deleted_at TIMESTAMP_TZ DEFAULT NULL,
 	password BINARY,
 	otp_code VARCHAR(6),
 	expired_otp TIMESTAMP_NTZ
 )
+
 CREATE TABLE Employees (
     id INT PRIMARY KEY AUTOINCREMENT,
     full_name VARCHAR NOT NULL,
@@ -28,8 +29,6 @@ CREATE TABLE Employees (
     file_url TEXT,
     created_at TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP(),
     updated_at TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP(),
-    resign_status BOOLEAN DEFAULT FALSE,
-    resign_date TIMESTAMP_TZ DEFAULT NULL,
     user_id INT REFERENCES Users(id) ON DELETE CASCADE
 );
 

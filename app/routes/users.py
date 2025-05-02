@@ -8,7 +8,7 @@ users_bp = Blueprint('users', __name__, url_prefix='/api/users')
 @users_bp.route('', methods=['POST'])
 def create_user():
     """
-    Create user
+    Create user HR
     ---
     tags:
       - Users
@@ -38,8 +38,6 @@ def create_user():
             data:
               type: object
               properties:
-                id:
-                  type: integer
                 name:
                   type: string
                 email:
@@ -70,9 +68,10 @@ def create_user():
     """
     data = request.json
     name = data.get("name")
-    email = data.get("email")
+    email = data.get("email").lower().strip() 
     password = data.get("password")
     role = "HR"
+    print(data)
 
     if not all([name, email, password, role]):
         return jsonify({"error": "Missing required fields"}), 400
@@ -87,30 +86,49 @@ def create_user():
 
     try:
         # Check for existing email
-        cursor.execute("SELECT 1 FROM Users WHERE email = %s AND is_deleted = FALSE", (email,))
-        if cursor.fetchone():
-            return jsonify({"error": "Email already exists"}), 409
-
+        cursor.execute("SELECT id, email, is_deleted FROM Users WHERE email = %s", (email,))
+        result = cursor.fetchone()
+        
+        if result is not None:
+          if result[2] == False:
+            return jsonify({"error": "Email already exists and active"}), 409
+          else:
+            hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())  # returns bytes
+            # Update user 
+            cursor.execute("""
+                UPDATE Users
+                SET is_deleted = FALSE
+                deleted_at = null,
+                password = %s
+                WHERE email = %s
+            """, (hashed_password, email))
+            conn.commit()
+            return jsonify({
+                "message": "User update to reactive",
+                "data": {
+                    "name": name,
+                    "email": email,
+                    "role": role
+                }
+            }), 200
         # Insert new user
         cursor.execute("""
             INSERT INTO Users (name, email, password, role)
             VALUES (%s, %s, %s, %s)
-            RETURNING id
         """, (name, email, hashed_password, role))
         
-        user_id = cursor.fetchone()[0]
         conn.commit()
 
         return jsonify({
             "message": "User created successfully",
             "data": {
-                "id": user_id,
                 "name": name,
                 "email": email,
                 "role": role
             }
         }), 201
     except Exception as e:
+        print(e)
         conn.rollback()
         return jsonify({"error": f"Database error: {str(e)}"}), 500
     finally:
@@ -186,6 +204,53 @@ def get_users():
             "data": users
         }), 200
     except Exception as e:
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+# create soft delete user is_deleted = TRUE and deleted_at = NOW()
+@users_bp.route('/<int:user_id>', methods=['DELETE'])
+def delete_user(user_id):
+    """
+    Delete user HR (soft delete)
+    ---
+    tags:
+      - Users
+    parameters:
+      - name: user_id
+        in: path
+        type: integer
+        required: true
+        description: ID of the user to delete
+    responses:
+      200:
+        description: User deleted successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+      404:
+        description: User not found
+      500:
+        description: Database error
+    """
+    if g.user_role != 'SUPERUSER':
+      return jsonify({"error": "You are not authorized to delete this user"}), 403
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE Users
+            SET is_deleted = TRUE, deleted_at = CURRENT_TIMESTAMP()
+            WHERE id = %s and role = 'HR'
+        """, (user_id,))
+        conn.commit()
+        return jsonify({"message": "User deleted successfully"}), 200
+    except Exception as e:
+        conn.rollback()
         return jsonify({"error": f"Database error: {str(e)}"}), 500
     finally:
         cursor.close()

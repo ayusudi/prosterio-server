@@ -92,7 +92,7 @@ def create_app():
         },
         {
             "name": "Gdrive",
-            "description": "Endpoints for managing Google Drive"
+            "description": "Endpoints for upload file to Google Drive"
         }
     ]
     }

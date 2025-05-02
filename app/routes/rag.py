@@ -35,9 +35,9 @@ rag_bp = Blueprint('rag', __name__, url_prefix='/api')
                                 'type': 'string',
                                 'description': 'Status message'
                             },
-                            'data': {
-                                'type': 'array',
-                                'description': 'Result from the RAG query'
+                            'answer': {
+                                'type': 'string',
+                                'description': 'Generated answer from the RAG query'
                             }
                         }
                     }
@@ -91,7 +91,7 @@ def handle_rag():
         FROM concatenated_context;""", (question, question))
         result = cursor.fetchone()
         print(result)
-        return jsonify({"message": "RAG data processed", "data": result})
+        return jsonify({"message": "RAG data processed", "answer": result[0]})
     except Exception as e:
         print(e)
         return jsonify({"error": str(e)}), 500

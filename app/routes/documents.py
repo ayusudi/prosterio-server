@@ -233,7 +233,6 @@ def extract_with_gemini():
                     SELECT email 
                     FROM Employees 
                     WHERE email IN ({})
-                    AND resign_status = FALSE
                 """.format(','.join(['%s'] * len(emails))), emails)
                 email_status = {email: False for email in emails}
                 for row in cursor.fetchall():

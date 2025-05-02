@@ -204,7 +204,7 @@ def get_chat_by_id(chat_id):
 @chats_bp.route('/<int:chat_id>', methods=['DELETE'])
 def delete_chat(chat_id):
     """
-    Delete a chat by ID
+    Delete a chat by ID (soft delete)
     ---
     tags:
       - Chats
