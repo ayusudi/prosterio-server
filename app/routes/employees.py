@@ -227,7 +227,7 @@ def create_employee():
                         target.distinctions = source.distinctions,
                         target.certifications = source.certifications,
                         target.file_url = source.file_url,
-                        target.user_id = source.user_id,
+                        target.user_id = source.user_id
                 WHEN NOT MATCHED THEN
                     INSERT (
                         full_name, email, job_title, promotion_years, profile,
