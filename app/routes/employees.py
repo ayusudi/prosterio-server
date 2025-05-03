@@ -90,7 +90,6 @@ employees_bp = Blueprint('employees', __name__, url_prefix='/api/employees')
                                     }
                                 },
                                 'certifications': {'type': 'array', 'items': {'type': 'string'}},
-                                'file_data': {'type': 'string', 'format': 'binary'}, # Note: Sending large binary data in JSON is inefficient. Consider multipart/form-data or separate upload endpoint.
                                 'file_url': {'type': 'string'}
                             },
                             'required': ['full_name', 'email', 'job_title']
@@ -185,7 +184,6 @@ def create_employee():
                     emp.get('publications'),
                     emp.get('distinctions'),
                     emp.get('certifications'),
-                    emp.get('file_data'), # Ensure this is bytes if BINARY type
                     emp.get('file_url'),
                     emp['user_id'],
                 ) for emp in valid_employees
@@ -228,7 +226,6 @@ def create_employee():
                         target.publications = source.publications,
                         target.distinctions = source.distinctions,
                         target.certifications = source.certifications,
-                        target.file_data = source.file_data,
                         target.file_url = source.file_url,
                         target.user_id = source.user_id,
                 WHEN NOT MATCHED THEN
@@ -236,12 +233,12 @@ def create_employee():
                         full_name, email, job_title, promotion_years, profile,
                         skills, professional_experiences, educations,
                         publications, distinctions, certifications,
-                        file_data, file_url, user_id, 
+                        file_url, user_id
                     ) VALUES (
                         source.full_name, source.email, source.job_title, source.promotion_years, source.profile,
                         source.skills, source.professional_experiences, source.educations,
                         source.publications, source.distinctions, source.certifications,
-                        source.file_data, source.file_url, source.user_id
+                        source.file_url, source.user_id
                     )
             """
 
@@ -387,7 +384,7 @@ def get_employees():
     try:
         cursor.execute("""
             SELECT id, full_name, job_title, email, file_url
-            FROM employees 
+            FROM employees ORDER BY full_name ASC
         """)
         rows = cursor.fetchall()
         employees = [
