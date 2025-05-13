@@ -188,7 +188,7 @@ def create_employee():
                     emp['user_id'] #13
                 ) for emp in valid_employees
             ]
-
+#  
             # Construct the MERGE statement
             # Note: Snowflake uses %s placeholders
             merge_sql = """
