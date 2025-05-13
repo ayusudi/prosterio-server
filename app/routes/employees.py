@@ -185,7 +185,7 @@ def create_employee():
                     emp.get('distinctions'),#10
                     emp.get('certifications'), #11
                     emp.get('file_url'), #12
-                    emp['user_id'], #13
+                    emp['user_id'] #13
                 ) for emp in valid_employees
             ]
 
