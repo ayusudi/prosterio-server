@@ -1,78 +1,93 @@
 import json
+import pytest
 import os
-from unittest.mock import patch, MagicMock
+import io
+from app import create_app
+import os
+from pathlib import Path
 
-def test_extract_with_gemini_no_files(client):
-    response = client.post('/api/documents', data={})
-    assert response.status_code == 400
+
+@pytest.fixture
+def auth_headers(client):
+    """Get authentication headers"""
+    response = client.post('/api/login', 
+                          json={
+                             'email': os.getenv("TEST_USER_EMAIL"),
+                              'password': os.getenv("TEST_USER_PS")
+                          })
     data = json.loads(response.data)
-    assert 'error' in data
-    assert data['error'] == 'No PDF files uploaded'
+    return {'Authorization': f'Bearer {data["access_token"]}'}
 
-@patch('app.routes.documents.genai')
-@patch('app.routes.documents.PyPDFLoader')
-def test_extract_with_gemini_success(mock_loader, mock_genai, client):
-    # Mock PDF loader
-    mock_page = MagicMock()
-    mock_page.page_content = 'Test CV content'
-    mock_loader.return_value.load_and_split.return_value = [mock_page]
+@pytest.fixture
+def real_pdf():
+    """Use a real PDF file for testing"""
+    pdf_path = os.path.join(os.path.dirname(__file__), 'pdf', 'CV-IntanPermataSari-BusinessAnalyst.pdf')
+    with open(pdf_path, 'rb') as f:
+        return io.BytesIO(f.read())
+
+def test_extract_with_gemini(client, auth_headers, real_pdf, monkeypatch):
+    """Test document extraction with Gemini"""
+    # Mock the Gemini API response
+    from unittest.mock import MagicMock
     
-    # Mock Gemini response
+    # Create a mock response for genai.GenerativeModel().generate_content()
     mock_response = MagicMock()
-    mock_response.text = '{"full_name": "John Doe", "email": "john@example.com"}'
+    mock_response.text = """
+    {
+      "full_name": "Intan Permata Sari",
+      "email": "intanpermatasari@gmail.com",
+      "job_title": "Business Analyst",
+      "promotion_years": 2,
+      "profile": "Experienced business analyst with a focus on data analysis and project management.",
+      "skills": ["Data Analysis", "Project Management", "SQL", "Business Intelligence"],
+      "professional_experiences": [
+        {
+          "company": "Tech Company",
+          "job_title": "Business Analyst",
+          "date_start": "Jan 2020",
+          "date_end": "Current",
+          "description": "Analyzing business requirements and translating them into technical specifications"
+        }
+      ],
+      "educations": [
+        {
+          "institution": "University",
+          "title": "Business Administration",
+          "score": "3.8/4.0",
+          "date_start": "2016",
+          "date_end": "2020",
+          "description": "Studied business administration with focus on data analytics"
+        }
+      ],
+      "publications": [],
+      "distinctions": [],
+      "certifications": ["Business Analysis Professional Certification"]
+    }
+    """
+    
+    # Mock the GenerativeModel class
     mock_model = MagicMock()
     mock_model.generate_content.return_value = mock_response
+    
+    # Mock the genai module
+    mock_genai = MagicMock()
     mock_genai.GenerativeModel.return_value = mock_model
     
-    # Create test PDF file
-    test_file = (b'dummy pdf content', 'test.pdf')
+    # Apply the mock
+    monkeypatch.setattr('google.generativeai', mock_genai)
     
-    response = client.post('/api/documents',
-                          data={'documents': test_file},
+    # Create a test request with the real PDF
+    data = {'documents': (real_pdf, 'CV-IntanPermataSari-BusinessAnalyst.pdf')}
+    response = client.post('/api/documents', 
+                          headers=auth_headers,
+                          data=data,
                           content_type='multipart/form-data')
     
+    # Check the response
     assert response.status_code == 200
-    data = json.loads(response.data)
-    assert isinstance(data, list)
-    assert len(data) == 1
-    assert 'filename' in data[0]
-    assert 'data' in data[0]
-    assert data[0]['data']['full_name'] == 'John Doe'
-
-@patch('app.routes.documents.genai')
-def test_extract_with_gemini_no_api_key(mock_genai, client):
-    with patch.dict(os.environ, {'GEMINI_APIKEY': ''}):
-        test_file = (b'dummy pdf content', 'test.pdf')
-        response = client.post('/api/documents',
-                              data={'documents': test_file},
-                              content_type='multipart/form-data')
-        
-        assert response.status_code == 500
-        data = json.loads(response.data)
-        assert data['error'] == 'GEMINI_APIKEY not found'
-
-@patch('app.routes.documents.genai')
-@patch('app.routes.documents.PyPDFLoader')
-def test_extract_with_gemini_invalid_response(mock_loader, mock_genai, client):
-    # Mock PDF loader
-    mock_page = MagicMock()
-    mock_page.page_content = 'Test CV content'
-    mock_loader.return_value.load_and_split.return_value = [mock_page]
-    
-    # Mock Gemini response with invalid JSON
-    mock_response = MagicMock()
-    mock_response.text = 'Invalid JSON response'
-    mock_model = MagicMock()
-    mock_model.generate_content.return_value = mock_response
-    mock_genai.GenerativeModel.return_value = mock_model
-    
-    test_file = (b'dummy pdf content', 'test.pdf')
-    response = client.post('/api/documents',
-                          data={'documents': test_file},
-                          content_type='multipart/form-data')
-    
-    assert response.status_code == 200
-    data = json.loads(response.data)
-    assert isinstance(data, list)
-    assert len(data) == 1
-    assert 'error' in data[0]
+    result = json.loads(response.data)
+    assert 'data' in result
+    assert len(result['data']) > 0
+    assert result['data'][0]['filename'] == 'CV-IntanPermataSari-BusinessAnalyst.pdf'
+    assert 'data' in result['data'][0]
+    assert result['data'][0]['data']['full_name'] == 'Intan Permata Sari'

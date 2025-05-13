@@ -17,7 +17,6 @@ conn = snowflake.connector.connect(
     ocsp_fail_open=True
 )
 
-
 # SQL query to insert data into the table
 insert_sql = """
 INSERT INTO Users (name, email, password, role)

@@ -1,3 +1,4 @@
+-- Migration for Talent Recomendation System
 CREATE TABLE Users (
     id INT PRIMARY KEY AUTOINCREMENT,
 	name VARCHAR NOT NULL,
@@ -40,6 +41,11 @@ CREATE TABLE Content_Chunks (
     employee_id INT REFERENCES Employees(id) ON DELETE SET NULL
 );
 
+
+
+
+
+
 CREATE TABLE Chats (
     id INT PRIMARY KEY AUTOINCREMENT,
     title VARCHAR NOT NULL,
@@ -49,4 +55,27 @@ CREATE TABLE Chats (
     updated_at TIMESTAMP_TZ DEFAULT CURRENT_TIMESTAMP(),
     is_deleted BOOLEAN DEFAULT FALSE,
     deleted_at TIMESTAMP_TZ DEFAULT NULL
+);
+
+-- Migration for LLM Evaluations
+CREATE TABLE EVALUATIONS (
+    id INTEGER AUTOINCREMENT PRIMARY KEY,
+    question TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    cortex_coherence FLOAT,
+    groundedness FLOAT,
+    relevance FLOAT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+);
+
+CREATE TABLE LLM_EVALUATIONS (
+    RUN_ID VARCHAR(36) PRIMARY KEY,
+    TIMESTAMP TIMESTAMP_NTZ,
+    USER_INPUT TEXT,
+    MODEL_RESPONSE TEXT,
+    LATENCY_SECONDS FLOAT,
+    TOKEN_COUNT INTEGER,
+    MODEL_NAME VARCHAR(100),
+    STATUS VARCHAR(20),
+    ERROR_MESSAGE TEXT
 );

@@ -6,8 +6,12 @@ from flask_cors import CORS
 from flask_mail import Mail
 import os
 
-def create_app():
+def create_app(test_config=None):
     app = Flask(__name__)
+
+    # Apply test configuration if provided
+    if test_config:
+        app.config.update(test_config)
 
     # Configure CORS with specific origins and options
     CORS(app, resources={

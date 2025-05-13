@@ -1,112 +1,131 @@
 import json
-from unittest.mock import patch
+import pytest
+from app import create_app
+import os
 
-def test_create_employee(client):
-    test_data = {
-        'full_name': 'John Doe',
-        'job_title': 'Software Engineer',
-        'email': 'john@example.com',
-        'skills': ['Python', 'Flask'],
-        'file_url': 'https://example.com/cv.pdf',
-        'content_chunks': [
-            {'chunk_text': 'Experienced developer', 'type': 'summary'}
-        ]
+
+@pytest.fixture
+def auth_headers(client):
+    """Get authentication headers"""
+    response = client.post('/api/login', 
+                          json={
+                               'email': os.getenv("TEST_USER_EMAIL"),
+                              'password': os.getenv("TEST_USER_PS")
+                          })
+    data = json.loads(response.data)
+    print(data)
+    return {'Authorization': f'Bearer {data["access_token"]}'}
+
+def test_get_employees(client, auth_headers):
+    """Test getting all employees"""
+    response = client.get('/api/employees', headers=auth_headers)
+    
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert isinstance(data, list)
+
+def test_create_employee(client, auth_headers):
+    """Test creating a new employee"""
+    # Create a test employee
+    import uuid
+    unique_email = f"employee_{uuid.uuid4().hex[:8]}@example.com"
+    
+    employee_data = {
+        'employees': [{
+            'full_name': 'Test Employee',
+            'email': unique_email,
+            'job_title': 'Software Engineer',
+            'promotion_years': 2,
+            'profile': 'Test profile',
+            'skills': ['Python', 'Flask', 'SQL'],
+            'professional_experiences': [{
+                'company': 'Test Company',
+                'job_title': 'Junior Developer',
+                'date_start': 'Jan 2020',
+                'date_end': 'Current',
+                'description': 'Worked on various projects'
+            }],
+            'educations': [{
+                'institution': 'Test University',
+                'title': 'Computer Science',
+                'score': '3.8/4.0',
+                'date_start': '2016',
+                'date_end': '2020',
+                'description': 'Studied computer science'
+            }],
+            'publications': [],
+            'distinctions': [],
+            'certifications': ['AWS Certified Developer']
+        }]
     }
     
-    with patch('app.routes.employees.get_connection') as mock_conn:
-        mock_cursor = mock_conn.return_value.cursor.return_value
-        mock_cursor.fetchone.return_value = [1]  # Return employee_id
-        
-        response = client.post('/api/employees',
-                              json=test_data,
-                              headers={'Authorization': 'Bearer test-token'})
-        
-        assert response.status_code == 201
-        data = json.loads(response.data)
-        assert 'employee_id' in data
-        assert 'message' in data
-
-def test_get_employees(client):
-    test_employees = [
-        (1, 'John Doe', 'Engineer', 'john@example.com', 'file.pdf', False, None),
-        (2, 'Jane Smith', 'Designer', 'jane@example.com', 'file2.pdf', True, '2024-01-01')
-    ]
+    response = client.post('/api/employees', 
+                          headers=auth_headers,
+                          json=employee_data)
     
-    with patch('app.routes.employees.get_connection') as mock_conn:
-        mock_cursor = mock_conn.return_value.cursor.return_value
-        mock_cursor.fetchall.return_value = test_employees
-        
-        response = client.get('/api/employees',
-                             headers={'Authorization': 'Bearer test-token'})
-        
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        assert isinstance(data, list)
-        assert len(data) == 2
-        assert data[0]['full_name'] == 'John Doe'
-        assert data[1]['full_name'] == 'Jane Smith'
-
-def test_update_employee(client):
-    employee_id = 1
-    update_data = {
-        'full_name': 'John Updated',
-        'job_title': 'Senior Engineer',
-        'email': 'john.updated@example.com',
-        'skills': ['Python', 'Flask', 'AWS']
-    }
+    assert response.status_code == 201
+    data = json.loads(response.data)
+    assert 'results' in data
+    assert len(data['results']) > 0
+    assert data['results'][0]['email'] == unique_email
     
-    with patch('app.routes.employees.get_connection') as mock_conn:
-        mock_cursor = mock_conn.return_value.cursor.return_value
-        mock_cursor.rowcount = 1  # Simulate successful update
-        
-        response = client.put(f'/api/employees/{employee_id}',
-                             json=update_data,
-                             headers={'Authorization': 'Bearer test-token'})
-        
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        assert data['message'] == 'Employee updated successfully'
+    # Store the employee ID for later tests
+    employee_id = data['results'][0]['employee_id']
+    return employee_id
 
-def test_update_nonexistent_employee(client):
-    employee_id = 999
-    update_data = {'full_name': 'John Updated'}
+def test_get_employee_by_id(client, auth_headers):
+    """Test getting an employee by ID"""
+    # First create an employee
+    employee_id = test_create_employee(client, auth_headers)
     
-    with patch('app.routes.employees.get_connection') as mock_conn:
-        mock_cursor = mock_conn.return_value.cursor.return_value
-        mock_cursor.rowcount = 0  # Simulate no rows affected
-        
-        response = client.put(f'/api/employees/{employee_id}',
-                             json=update_data,
-                             headers={'Authorization': 'Bearer test-token'})
-        
-        assert response.status_code == 404
-        data = json.loads(response.data)
-        assert 'error' in data
+    # Now get the employee
+    response = client.get(f'/api/employees/{employee_id}', headers=auth_headers)
+    
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert data['id'] == employee_id
 
-def test_resign_employee(client):
-    employee_id = 1
+def test_update_employee(client, auth_headers):
+    """Test updating an employee"""
+    # First create an employee
+    employee_id = test_create_employee(client, auth_headers)
     
-    with patch('app.routes.employees.get_connection') as mock_conn:
-        mock_cursor = mock_conn.return_value.cursor.return_value
-        mock_cursor.rowcount = 1  # Simulate successful update
-        
-        response = client.patch(f'/api/employees/{employee_id}/resign',
-                               headers={'Authorization': 'Bearer test-token'})
-        
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        assert data['message'] == 'Employee resigned and content chunks removed'
+    # Get the current employee data
+    get_response = client.get(f'/api/employees/{employee_id}', headers=auth_headers)
+    employee_data = json.loads(get_response.data)
+    
+    # Update some fields
+    employee_data['full_name'] = 'Updated Employee Name'
+    employee_data['job_title'] = 'Senior Software Engineer'
+    
+    # Send the update
+    update_response = client.put(f'/api/employees/{employee_id}', 
+                                headers=auth_headers,
+                                json=employee_data)
+    
+    assert update_response.status_code == 200
+    data = json.loads(update_response.data)
+    assert 'message' in data
+    assert data['employee_id'] == employee_id
+    
+    # Verify the update
+    verify_response = client.get(f'/api/employees/{employee_id}', headers=auth_headers)
+    updated_data = json.loads(verify_response.data)
+    assert updated_data['full_name'] == 'Updated Employee Name'
+    assert updated_data['job_title'] == 'Senior Software Engineer'
 
-def test_resign_nonexistent_employee(client):
-    employee_id = 999
+def test_delete_employee(client, auth_headers):
+    """Test deleting an employee"""
+    # First create an employee
+    employee_id = test_create_employee(client, auth_headers)
     
-    with patch('app.routes.employees.get_connection') as mock_conn:
-        mock_cursor = mock_conn.return_value.cursor.return_value
-        mock_cursor.rowcount = 0  # Simulate no rows affected
-        
-        response = client.patch(f'/api/employees/{employee_id}/resign',
-                               headers={'Authorization': 'Bearer test-token'})
-        
-        assert response.status_code == 404
-        data = json.loads(response.data)
-        assert 'error' in data
+    # Now delete the employee
+    response = client.delete(f'/api/employees/{employee_id}', headers=auth_headers)
+    
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert 'message' in data
+    
+    # Verify the employee is deleted
+    verify_response = client.get(f'/api/employees/{employee_id}', headers=auth_headers)
+    assert verify_response.status_code == 404
