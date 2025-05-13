@@ -30,3 +30,9 @@ google-auth-oauthlib==1.2.1
 google-api-python-client==2.149.0
 python-multipart==0.0.20
 langsmith==0.3.42
+trulens==1.4.9
+trulens-core==1.4.9
+trulens-dashboard==1.4.9
+trulens-feedback==1.4.9
+trulens-otel-semconv==1.4.9
+trulens_eval==1.4.9
