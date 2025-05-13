@@ -172,20 +172,20 @@ def create_employee():
             # Order must match the order in the USING clause's VALUES alias
             merge_data = [
                 (
-                    emp.get('id'), # Use None for inserts
-                    emp['full_name'],
-                    emp['email'],
-                    emp['job_title'],
-                    emp.get('promotion_years'),
-                    emp.get('profile'),
-                    emp.get('skills'), # Pass Python list directly
-                    emp.get('professional_experiences'), # Pass Python list of dicts directly
-                    emp.get('educations'),
-                    emp.get('publications'),
-                    emp.get('distinctions'),
-                    emp.get('certifications'),
-                    emp.get('file_url'),
-                    emp['user_id'],
+                    emp.get('id'), # Use None for inserts 0
+                    emp['full_name'], # 1
+                    emp['email'], # 2
+                    emp['job_title'],# 3
+                    emp.get('promotion_years'),# 4
+                    emp.get('profile'), # 5
+                    emp.get('skills'), # Pass Python list directly 6
+                    emp.get('professional_experiences'), # Pass Python list of dicts directly 7
+                    emp.get('educations'), #8
+                    emp.get('publications'), #9
+                    emp.get('distinctions'),#10
+                    emp.get('certifications'), #11
+                    emp.get('file_url'), #12
+                    emp['user_id'], #13
                 ) for emp in valid_employees
             ]
 
@@ -207,9 +207,8 @@ def create_employee():
                         PARSE_JSON(v.value[9]::VARCHAR) as publications,
                         PARSE_JSON(v.value[10]::VARCHAR) as distinctions,
                         PARSE_JSON(v.value[11]::VARCHAR) as certifications,
-                        BASE64_DECODE_BINARY(v.value[12]::VARCHAR) as file_data,
-                        v.value[13]::VARCHAR as file_url,
-                        v.value[14]::INTEGER as user_id
+                        v.value[12]::VARCHAR as file_url,
+                        v.value[13]::INTEGER as user_id
                     FROM TABLE(FLATTEN(input => PARSE_JSON(%s))) v
                 ) AS source
                 ON target.id = source.id OR target.email = source.email
